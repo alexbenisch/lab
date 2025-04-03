@@ -4,56 +4,61 @@ terraform {
       source  = "hetznercloud/hcloud"
       version = "~>1.44"
     }
+    http = {
+      source  = "hashicorp/http"
+      version = "~>3.0"
+    }
   }
 }
+
 provider "hcloud" {
   token = var.hcloud_token
 }
 
-resource "hcloud_ssh_key" "alex" {
-  name       = "alex@tpad"
-  public_key = file(var.tpad_ssh_key)
-  name       = "alex@seven"
-  public_key = file(var.desktop_ssh_key)
+provider "http" {}
+
+data "http" "github_keys" {
+  url = "https://github.com/${var.github_username}.keys"
 }
 
+locals {
+  github_ssh_keys = split("\n", trimspace(data.http.github_keys.response_body))
+}
+
+output "ssh_keys" {
+  value = local.github_ssh_keys
+}
+
+resource "hcloud_ssh_key" "github" {
+  name       = "github-key"
+  public_key = local.github_ssh_keys[0]
+}
 
 resource "hcloud_server" "machine" {
   name        = "machine"
   image       = "debian-12"
   server_type = "cpx11"
   location    = "fsn1"
-  ssh_keys    = [hcloud_tpad_ssh_key.alex.id,hcloud_desktop_ssh_key]
+  ssh_keys    = [hcloud_ssh_key.github.id]
 
   public_net {
     ipv4_enabled = true
     ipv6_enabled = true
   }
+}
 
-  user_data = <<-EOF
-    #cloud-config
-    package_update: true
-    package_upgrade: true
-    packages:
-      - zsh
-      - gnupg
-      - git
-      - machine
-      - tmux
-      - fzf
-      - ripgrep
+variable "github_username" {
+  description = "GitHub Username für SSH Public Keys"
+  type        = string
+}
 
-users:
-  - name: alex
-    groups: ["wheel"]
-    shell: /bin/zsh
-    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
-    ssh-authorized-keys:
-      - ${hcloud_ssh_key.alex.public_key}
-    lock_passwd: false
-    passwd: "$6$rounds=4096$XJ5p3uJ5HUE68...hashedpassword..."
+variable "ssh_keys" {
+  description = "Liste der SSH Public Keys"
+  type        = list(string)
+  default     = []
+}
 
-
-
-
-variable "hcloud_token" {}
+variable "hcloud_token" {
+  description = "Hetzner Cloud API Token"
+  type        = string
+}
