@@ -8,18 +8,11 @@ terraform {
       source  = "hashicorp/http"
       version = "~>3.0"
     }
-    external = {
-      source  = "hashicorp/external"
-      version = "~>2.3"
-    }
   }
-}
-data "external" "hcloud_token" {
-  program = ["sh", "-c", "echo '{\"value\": \"'\"$HCLOUD_TOKEN\"'\"}'"]
 }
 
 provider "hcloud" {
-  token = data.external.hcloud_token.result.value
+  token = var.hcloud_token
 }
 
 provider "http" {}
