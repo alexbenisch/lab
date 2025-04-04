@@ -1,0 +1,19 @@
+version: '3.9'
+
+services:
+  lazyvim:
+    build: .
+    container_name: lazyvim
+    volumes:
+      - .:/workspace
+      - ~/.local/share/nvim:/root/.local/share/nvim
+      - ~/.cache/nvim:/root/.cache/nvim
+      - ~/.cache/nvim:/root/.cache/nvim
+      - ~/.tmux.conf:/root/.tmux.conf # Falls du eine eigene tmux-Config hast
+      - ~/.zshrc:/root/.zshrc # Nutze deine lokale .zshrc
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: ["zsh"]
+
+
