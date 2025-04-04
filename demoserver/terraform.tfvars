@@ -1,2 +1,0 @@
-hcloud_token = "DP62ynsyxAavT5nv7z6Esec0W1uF2xI1JkySVgX8GoBgCIwqcYbSyAJ16zkmwD9U"
-ssh_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAmm9jDoXxpMFSGUYFUCk56TaPPTxMRdgnTY9FCBwjF3 alex@tpad"
