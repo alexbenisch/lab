@@ -94,7 +94,7 @@ resource "null_resource" "provision" {
       ". /home/alex/.nix-profile/etc/profile.d/nix.sh",
       "nix-env -iA nixpkgs.ansible nixpkgs.git",
       "git clone https://github.com/alexbenisch/ansible-repo.git ~/ansible-setup",
-      "cd ~/ansible-setup && ansible-playbook -i localhost, playbook.yml --connection=local"
+      "cd ~/ansible-setup && ansible-playbook -i localhost, playbook.yml --connection=local",
       "curl -L https://nixos.org/nix/install | sh",
       ". /home/alex/.nix-profile/etc/profile.d/nix.sh",
       "nix-env -iA nixpkgs.ansible nixpkgs.git",
