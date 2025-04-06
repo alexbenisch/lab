@@ -36,11 +36,18 @@ exec > >(tee /var/log/user-data.log) 2>&1
 
 echo "Starting setup: $(date)"
 
+# Locale-Einstellungen setzen
+echo "🌐 Konfiguriere Locale-Einstellungen..."
+export LC_ALL=C.UTF-8
+export LANG=C.UTF-8
+locale-gen C.UTF-8
+update-locale LANG=C.UTF-8 LC_ALL=C.UTF-8
+
 # Minimalpakete installieren
 apt-get update && apt-get upgrade -y
-apt-get install -y git curl zsh sudo
+apt-get install -y git curl zsh sudo locales
 
-# Docker-Gruppe erstellen falls nicht vorhanden
+# Docker-Gruppe erstellen, falls nicht vorhanden
 groupadd -f docker
 
 # Benutzer erstellen (falls nicht durch cloud-init gemacht)
@@ -79,6 +86,15 @@ resource "null_resource" "provision" {
 
   provisioner "remote-exec" {
     inline = [
+      "export LC_ALL=C.UTF-8",
+      "export LANG=C.UTF-8",
+      "locale-gen C.UTF-8",
+      "update-locale LANG=C.UTF-8 LC_ALL=C.UTF-8",
+      "curl -L https://nixos.org/nix/install | sh",
+      ". /home/alex/.nix-profile/etc/profile.d/nix.sh",
+      "nix-env -iA nixpkgs.ansible nixpkgs.git",
+      "git clone https://github.com/alexbenisch/ansible-repo.git ~/ansible-setup",
+      "cd ~/ansible-setup && ansible-playbook -i localhost, playbook.yml --connection=local"
       "curl -L https://nixos.org/nix/install | sh",
       ". /home/alex/.nix-profile/etc/profile.d/nix.sh",
       "nix-env -iA nixpkgs.ansible nixpkgs.git",
