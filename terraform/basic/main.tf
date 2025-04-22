@@ -21,7 +21,7 @@ resource "hcloud_server" "basic" {
   image       = "debian-12"
   server_type = "cpx11"
   location    = "fsn1"
-  ssh_keys    = [hcloud_ssh_key.alex.id] # Statt var.ssh_key
+  ssh_keys    = [hcloud_ssh_key.alex.id]
 
   public_net {
     ipv4_enabled = true
@@ -29,33 +29,48 @@ resource "hcloud_server" "basic" {
   }
 
   user_data = <<-EOF
-    #cloud-config
-    package_update: true
-    package_upgrade: true
-    packages:
-      - zsh
-      - stow
-      - tmux
-      - fzf
-      - ripgrep
-      - git
-    users:
-      - name: alex
-        groups: ["sudo","docker"]
-        shell: /bin/zsh
-        sudo: ["ALL=(ALL) NOPASSWD:ALL"]
-        ssh-authorized-keys:
-          - ${var.ssh_key}
-        lock_passwd: false
-        passwd: "$6$rounds=4096$XJ5p3uJ5HUE68...hashedpassword..."  # Verschlüsseltes Passwort
-    runcmd:
-      - sudo -u alex git clone https://github.com/alexbenisch/dotfiles.git /home/alex/.local/share/dotfiles
-      - chsh -s $(which zsh) alex
-      - sudo -u alex bash /home/alex/.local/share/dotfiles/setup.sh
-      - echo "SETUP_COMPLETE: $(date)" | sudo tee /home/alex/setup_completed.log
-      - chmod 644 /home/alex/setup_completed.log
-      - chown alex:alex /home/alex/setup_completed.log
-  EOF
+#!/bin/bash
+
+# Logging konfigurieren
+exec > >(tee /var/log/user-data.log) 2>&1
+echo "Starting setup: $(date)"
+
+# Pakete aktualisieren und installieren
+apt-get update && apt-get upgrade -y
+apt-get install -y zsh stow tmux fzf ripgrep git
+
+# Docker-Gruppe erstellen falls nicht vorhanden
+groupadd -f docker
+
+# Benutzer erstellen (falls nicht durch cloud-init gemacht)
+if ! id -u alex >/dev/null 2>&1; then
+  useradd -m -s /bin/zsh -G sudo,docker alex
+  echo 'alex ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/alex
+  chmod 0440 /etc/sudoers.d/alex
+fi
+
+# SSH-Key einrichten
+mkdir -p /home/alex/.ssh
+echo '${var.ssh_key}' >> /home/alex/.ssh/authorized_keys
+chmod 700 /home/alex/.ssh
+chmod 600 /home/alex/.ssh/authorized_keys
+chown -R alex:alex /home/alex/.ssh
+
+# Dotfiles klonen und Setup ausführen
+sudo -u alex mkdir -p /home/alex/.local/share
+sudo -u alex git clone https://github.com/alexbenisch/dotfiles.git /home/alex/.local/share/dotfiles
+chsh -s $(which zsh) alex
+
+cd /home/alex/.local/share/dotfiles
+sudo -u alex bash setup.sh
+
+# Abschlussmeldung
+echo "SETUP_COMPLETE: $(date)" | tee /home/alex/setup_completed.log
+chmod 644 /home/alex/setup_completed.log
+chown alex:alex /home/alex/setup_completed.log
+
+echo "Setup finished: $(date)"
+EOF
 }
 resource "time_sleep" "wait_for_ip" {
   depends_on = [hcloud_server.basic]

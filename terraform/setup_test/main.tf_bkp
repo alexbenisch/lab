@@ -1,0 +1,119 @@
+terraform {
+  required_providers {
+    hcloud = {
+      source  = "hetznercloud/hcloud"
+      version = "~>1.44"
+    }
+    http = {
+      source  = "hashicorp/http"
+      version = "~>3.0"
+    }
+  }
+}
+
+provider "hcloud" {
+  token = var.hcloud_token
+}
+
+provider "http" {}
+
+data "http" "github_keys" {
+  url = "https://github.com/${var.github_username}.keys"
+}
+
+locals {
+  github_ssh_keys = split("\n", trimspace(data.http.github_keys.response_body))
+}
+
+output "ssh_keys" {
+  value = local.github_ssh_keys
+}
+
+resource "hcloud_ssh_key" "github" {
+  name       = "github-key"
+  public_key = local.github_ssh_keys[0]
+}
+
+resource "hcloud_server" "machine" {
+  name        = "machine"
+  image       = "debian-12"
+  server_type = "cpx11"
+  location    = "fsn1"
+  ssh_keys    = [hcloud_ssh_key.github.id]
+
+  public_net {
+    ipv4_enabled = true
+    ipv6_enabled = true
+  }
+
+  user_data = <<-EOF
+    #cloud-config
+    package_update: true
+    package_upgrade: true
+
+    users:
+      - name: alex
+        groups: sudo, docker
+        shell: /bin/zsh
+        sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+        ssh_authorized_keys:
+          - ${file("~/.ssh/id_ed25519.pub")}
+
+    ssh_pwauth: false
+
+    packages:
+      - zsh
+      - tmux
+      - starship
+      - git
+      - neovim
+      - docker.io
+
+    runcmd:
+      # 🔹 Sicherstellen, dass alex das Home-Verzeichnis gehört
+      - chown -R alex:alex /home/alex
+      - chmod 700 /home/alex
+      
+      # 🔹 SSH-Verzeichnis & authorized_keys richtig setzen
+      - sudo -u alex mkdir -p /home/alex/.ssh
+      - sudo -u alex chmod 700 /home/alex/.ssh
+      - sudo -u alex touch /home/alex/.ssh/authorized_keys
+      - sudo -u alex chmod 600 /home/alex/.ssh/authorized_keys
+      - echo 'PasswordAuthentication no' >> /etc/ssh/sshd_config
+      - echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config
+ 
+      # 🔹 SSH-Dienst neustarten, damit Änderungen greifen
+      - systemctl restart sshd
+  EOF
+}
+
+
+resource "time_sleep" "wait_for_ip" {
+  depends_on = [hcloud_server.machine]
+
+  create_duration = "30s" # Wartezeit (anpassen je nach Hetzner Geschwindigkeit)
+}
+
+output "server_ip" {
+  depends_on = [time_sleep.wait_for_ip]
+  value      = hcloud_server.machine.ipv4_address
+}
+
+
+variable "github_username" {
+  description = "GitHub Username für SSH Public Keys"
+  type        = string
+}
+
+variable "ssh_keys" {
+  description = "Liste der SSH Public Keys"
+  type        = list(string)
+  default     = []
+}
+
+variable "hcloud_token" {
+  description = "Hetzner Cloud API Token"
+  type        = string
+}
+
+

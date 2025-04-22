@@ -172,3 +172,11 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Terraform Variables Files
+*.tfvars
+**/*.tfvars
+
+# Exclude example files
+!*.tfvars.example
+!**/*.tfvars.example
